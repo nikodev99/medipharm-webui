@@ -1,12 +1,12 @@
 import axios from "axios";
 import {loggedUser} from "@/utils/LoggedUser.ts";
 import type {
+    AddInventoryRequest,
     AnalyticsData,
-    AuthResponse,
+    AuthResponse, CreateMedication,
     CreatePharmacyData,
-    DashboardStats,
-    LoginCredentials, Medication,
-    Pharmacy, User
+    DashboardStats, Inventory,
+    LoginCredentials, Medication, Pharmacy
 } from "@/types";
 import {redirectTo} from "@/context/RedirectContext.ts";
 
@@ -14,11 +14,8 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 export const mod = {
     auth: '/auth',
-    user: '/user',
-    search: '/search',
-    pharmacy: '/pharmacy',
+    superAdmin: '/superadmin',
     admin: '/admin',
-    medication: '/medication',
 }
 
 const api = axios.create({
@@ -47,30 +44,44 @@ api.interceptors.response.use(
 
 export const authApi = {
     login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+        console.log({credentials})
         const response = await api.post<AuthResponse>(`${mod.auth}/login`, credentials)
+        console.log({response})
         return response.data
     }
 }
 
-export const dashboardApi = {
+export const superAdminApi = {
     getStats: async (): Promise<DashboardStats> => {
-        const response = await api.get<DashboardStats>(`${mod.admin}/stats`)
+        const response = await api.get<DashboardStats>(`${mod.superAdmin}/dashboard_stats`)
         return response.data
     },
 
-    getAnalytics: async (days: number): Promise<AnalyticsData> => {
-        const response = await api.get<AnalyticsData>(`${mod.admin}/analytics`, {
+    getAnalytics: async (days: number = 7): Promise<AnalyticsData> => {
+        const response = await api.get<AnalyticsData>(`${mod.superAdmin}/dashboard_analytics`, {
             params: {
                 days: days,
             }
         })
         return response.data
-    }
-}
+    },
 
-export const pharmacyApi = {
+    createMedication: async (medication: CreateMedication): Promise<CreateMedication> => {
+        const response = await api.post<CreateMedication>(`${mod.superAdmin}/medications`, medication)
+        return response.data
+    },
+
+    getMedications: async (search?: string): Promise<Medication[]> => {
+        const response = await api.get<Medication[]>(`${mod.superAdmin}/medications`, {
+            params: {
+                ...(search ? {search}: {})
+            }
+        })
+        return response.data
+    },
+
     getPharmacies: async (search?: string, city?: string, status?: string): Promise<Pharmacy[]> => {
-        const response = await api.get<Pharmacy[]>(`${mod.pharmacy}/all`, {
+        const response = await api.get<Pharmacy[]>(`${mod.superAdmin}/pharmacies`, {
             params: {
                 ...(search ? {search}: {}),
                 ...(city ? {city}: {}),
@@ -81,44 +92,52 @@ export const pharmacyApi = {
     },
 
     createPharmacy: async (data: CreatePharmacyData): Promise<Pharmacy> => {
-        const response = await api.post<Pharmacy>(mod.pharmacy, data)
+        const response = await api.post<Pharmacy>(mod.superAdmin + '/pharmacies', data)
         return response.data
     },
 
-    toggleStatus: async (id: string): Promise<void> => {
-        await api.patch(`${mod.pharmacy}/status/${id}`)
+    verifyPharmacy: async (id: number): Promise<void> => {
+        await api.patch(`${mod.superAdmin}/pharmacies/${id}/verify`)
     },
 
-    verifyPharmacy: async (id: string): Promise<void> => {
-        await api.patch(`${mod.pharmacy}/verify/${id}`)
+    toggleStatus: async (id: number): Promise<void> => {
+        await api.patch(`${mod.superAdmin}/pharmacies/${id}/status`)
     }
 }
 
-export const medicationsApi = {
-    getMedications: async (search?: string): Promise<Medication[]> => {
-        const response = await api.get<Medication[]>(mod.medication, {
-            params: {
-                ...(search ? {search}: {}),
-            }
-        })
+export const adminApi = {
+    getStats: async (): Promise<DashboardStats> => {
+        const response = await api.get<DashboardStats>(`${mod.admin}/dashboard_stats`)
         return response.data
-    }
-}
+    },
 
-export const userApi = {
-    getUsers: async (search?: string, role?: string, isPremium?: boolean): Promise<User[]> => {
-        const response = await api.get<User[]>(mod.user, {
+    getAnalytics: async (days: number = 7): Promise<AnalyticsData> => {
+        const response = await api.get<AnalyticsData>(`${mod.admin}/dashboard_analytics`, {
             params: {
-                ...(search ? {search}: {}),
-                ...(role ? {role}: {}),
-                ...(isPremium ? {isPremium: isPremium}: {})
+                days: days,
             }
         })
         return response.data
     },
 
-    createPharmacyAdmin: async (data: User)=> {
-        const response = await api.post<Pharmacy>(`${mod.auth}/admin`, data)
+    getInventory: async (search?: string, lowStock?: boolean): Promise<Inventory[]> => {
+        const response = await api.get<Inventory[]>(mod.admin + '/inventory', {
+            params: {
+                ...(search ? {search: search}: {}),
+                ...(lowStock ? {lowStock: lowStock}: {})
+            }
+        })
+        return response.data
+    },
+
+    addInventory: async (request: AddInventoryRequest): Promise<AddInventoryRequest> => {
+        const response = await api.post<AddInventoryRequest>(mod.admin + '/inventory', request)
+        return response.data
+    },
+
+    addMedications: async (request: CreateMedication[]): Promise<CreateMedication[]> => {
+        const response = await api.post<CreateMedication[]>(mod.admin + '/bulk/medication', request)
         return response.data
     }
 }
+
